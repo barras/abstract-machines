@@ -69,24 +69,24 @@ let rec spam (st:state) : value =
 
 (* Non tail-recursive version of the machine.
    Very close to call-by-name. *)
-let rec splmad0 (st:state) : value =
+let rec smad0 (st:state) : value =
   match st with
-  | App(u,v), e, stk -> splmad0 (u,e,(v,e)::stk)
+  | App(u,v), e, stk -> smad0 (u,e,(v,e)::stk)
   | Lam(x,u), e, (v::stk) ->
-     splmad0 (u,Env.add x (ref(Clos v)) e, stk)
+     smad0 (u,Env.add x (ref(Clos v)) e, stk)
   | Var x, e, stk ->
      let v =
        let p = Env.find x e in
        match !p with
        | Clos(t,e') ->
 	  p:=Box;
-  	  let v = splmad0 (t,e',[]) in
+  	  let v = smad0 (t,e',[]) in
 	  assert (!p=Box);
 	  p:=v;
 	  v
        | v -> v in
      (match v with
-     | Clos(t,e') -> splmad0(t,e',stk)
+     | Clos(t,e') -> smad0(t,e',stk)
      | Neutr(a,stk') -> Neutr(a,stk'@stk)
      | Box -> assert false)
   | (Lam _ as t, e, []) -> Clos(t,e)
@@ -94,27 +94,27 @@ let rec splmad0 (st:state) : value =
 type dump = (ptr * stack) list
 type dstate = term * env * stack * dump
 
-let rec splmad (st:dstate) : value =
+let rec smad (st:dstate) : value =
   match st with
-  | App(u,v), e, stk, d -> splmad (u,e,(v,e)::stk,d)
+  | App(u,v), e, stk, d -> smad (u,e,(v,e)::stk,d)
   | Var x, e, stk, d ->
      let p = Env.find x e in 
      (match !p with
      | Clos(t,e') ->
 	 p:=Box;
-         splmad (t,e',[],(p,stk)::d)
+         smad (t,e',[],(p,stk)::d)
      | Neutr(a,stk') ->
 	let m = Neutr(a,stk'@stk) in
 	(match d with
-	| (p'',stk'')::d' -> p'':=m; splmad(Var "x",one ("x",p''),stk'',d')
+	| (p'',stk'')::d' -> p'':=m; smad(Var "x",one ("x",p''),stk'',d')
 	| [] -> m)
      | _ -> assert false)
   | Lam(x,u), e, (v::stk), d ->
-     splmad (u,Env.add x (ref(Clos v)) e, stk, d)
+     smad (u,Env.add x (ref(Clos v)) e, stk, d)
   | Lam _ as t, e, [], (p,stk)::d ->
      assert (!p=Box);
      p := Clos(t,e);
-     splmad(t,e,stk,d)
+     smad(t,e,stk,d)
   | (Lam _ as t, e, [], []) -> Clos(t,e)
 
 (* Examples *)
@@ -131,10 +131,10 @@ let mult m n = app m [ze;lam "h"(fun h -> plus n h)]
 
 let run_spam0 t e = spam0(t,e)
 let run_spam t e = spam(t,e,[])
-let run_splmad0 t e = splmad0(t,e,[])
-let run_splmad t e = splmad(t,e,[],[])
+let run_smad0 t e = smad0(t,e,[])
+let run_smad t e = smad(t,e,[],[])
 
-let run = ref run_splmad
+let run = ref run_smad
 
 let eval_num (t:lam) =
   let fv x = ref(Neutr((Var x,Env.empty),[])) in

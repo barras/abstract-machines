@@ -100,7 +100,7 @@ let rec spam (st:'a state) : 'a value =
   | Var n, e, stk ->
      (match !(Env.access n e) with
      | Clos(t,e') -> spam(t,e',stk)
-     (* free var *)
+     (* neutral value *)
      | Neutr(a,stk') -> Neutr(a,stk'@stk)
      | Box -> assert false)
   (* final states *)
@@ -110,24 +110,24 @@ let rec spam (st:'a state) : 'a value =
 
 (* Non tail-recursive version of the machine.
    Very close to call-by-name. *)
-let rec splmad0 (st:'a state) : 'a value =
+let rec smad0 (st:'a state) : 'a value =
   match st with
-  | App(u,v), e, stk -> splmad0 (u,e,(v,e)::stk)
+  | App(u,v), e, stk -> smad0 (u,e,(v,e)::stk)
   | Lam(_,u), e, (v::stk) ->
-     splmad0 (u,Env.push(ref(Clos v)) e, stk)
+     smad0 (u,Env.push(ref(Clos v)) e, stk)
   | Var n, e, stk ->
      let v =
        let p = Env.access n e in
        match !p with
        | Clos(t,e') ->
 	  p:=Box;
-  	  let v = splmad0 (t,e',[]) in
+  	  let v = smad0 (t,e',[]) in
 	  assert (!p=Box);
 	  p:=v;
 	  v
        | v -> v in
      (match v with
-     | Clos(t,e') -> splmad0(t,e',stk)
+     | Clos(t,e') -> smad0(t,e',stk)
      | Neutr(a,stk') -> Neutr(a,stk'@stk)
      | Box -> assert false)
   | (Lam _ as t, e, []) -> Clos(t,e)
@@ -135,15 +135,15 @@ let rec splmad0 (st:'a state) : 'a value =
 type 'a dump = ('a ptr * 'a stack) list
 type 'a dstate = term * 'a env * 'a stack * 'a dump
 
-let rec splmad (st:'a dstate) : 'a value =
+let rec smad (st:'a dstate) : 'a value =
   match st with
-  | App(u,v), e, stk, d -> splmad (u,e,(v,e)::stk,d)
+  | App(u,v), e, stk, d -> smad (u,e,(v,e)::stk,d)
   | Var n, e, stk, d ->
      let p = Env.access n e in 
      (match !p with
      | Clos(t,e') ->
 	 p:=Box;
-         splmad (t,e',[],(p,stk)::d)
+         smad (t,e',[],(p,stk)::d)
      | Neutr(a,astk) ->
 	let astk' =
           List.fold_left
@@ -152,11 +152,11 @@ let rec splmad (st:'a dstate) : 'a value =
 	Neutr(a,astk')
      | Box -> assert false)
   | Lam(_,u), e, (v::stk), d ->
-     splmad (u,Env.push(ref(Clos v)) e, stk, d)
+     smad (u,Env.push(ref(Clos v)) e, stk, d)
   | Lam _ as t, e, [], (p,stk)::d ->
      assert (!p=Box);
      p := Clos(t,e);
-     splmad(t,e,stk,d)
+     smad(t,e,stk,d)
   | (Lam _ as t, e, [], []) -> Clos(t,e)
 
 
@@ -199,16 +199,16 @@ let rec spam (st:'a state) : 'a value =
 type 'a dump = ('a ptr * 'a stack) list
 type 'a dstate = term * 'a env * 'a stack * 'a dump
 
-let rec splmad (st:'a dstate) : 'a value =
+let rec smad (st:'a dstate) : 'a value =
   match st with
-  | App(u,v), e, stk, d -> splmad (u,e,(v,e)::stk,d)
+  | App(u,v), e, stk, d -> smad (u,e,(v,e)::stk,d)
   | Var n, e, stk, d ->
      let p = Env.access n e in 
      (match !p with
      | Clos(t,e') ->
 	 p:=Box;
-         splmad (t,e',[],(p,stk)::d)
-     | Val(Fun(x,t,e')) -> splmad (Lam(x,t),e',stk,d)
+         smad (t,e',[],(p,stk)::d)
+     | Val(Fun(x,t,e')) -> smad (Lam(x,t),e',stk,d)
      | Val(Neutr(a,astk)) ->
 	let astk' =
           List.fold_left
@@ -217,11 +217,11 @@ let rec splmad (st:'a dstate) : 'a value =
 	Neutr(a,astk')
      | Box -> assert false)
   | Lam(_,u), e, (v::stk), d ->
-     splmad (u,Env.push(ref(Clos v)) e, stk, d)
+     smad (u,Env.push(ref(Clos v)) e, stk, d)
   | Lam _ as t, e, [], (p,stk)::d ->
      assert (!p=Box);
      p := Clos(t,e);
-     splmad(t,e,stk,d)
+     smad(t,e,stk,d)
   | (Lam(x,u), e, [], []) -> Fun(x,u,e)
 
 end
@@ -240,10 +240,10 @@ let mult m n = app m [ze;lam "h"(fun h -> plus n h)]
 
 let run_spam0 t e = spam0(t,e)
 let run_spam t e = spam(t,e,[])
-let run_splmad0 t e = splmad0(t,e,[])
-let run_splmad t e = splmad(t,e,[],[])
+let run_smad0 t e = smad0(t,e,[])
+let run_smad t e = smad(t,e,[],[])
 
-let run = ref run_splmad
+let run = ref run_smad
 
 let eval_num (t:lam) =
   let fv n = ref(Neutr(n,[])) in
